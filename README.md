@@ -38,8 +38,8 @@ Total cost to run: **$0**. (See `SECURITY_NOTES` in the API routes if you want t
 
 ```bash
 # 1. clone your repo
-git clone https://github.com/YOUR-USERNAME/menu-truth-engine.git
-cd menu-truth-engine
+git clone https://github.com/Obed-Cudjoe/leasesentry.git
+cd leasesentry
 
 # 2. install dependencies
 npm install
