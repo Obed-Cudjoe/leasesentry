@@ -1,0 +1,16 @@
+# Netlify configuration for the Next.js App Router site.
+# Committed so the deploy is fully reproducible from the repo (no dashboard fiddling).
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+  functions = ".netlify/functions"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Rewrite everything to Next.js so client-side routing works on a hard refresh.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
