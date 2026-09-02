@@ -1,3 +1,16 @@
+// ---------------------------------------------------------------------------
+// SECURITY NOTES (read if you're hardening this for production handoff)
+//  1. Every body is validated with Zod before it reaches the database — no
+//     raw user input is ever trusted. Invalid input is rejected with a 400.
+//  2. The Supabase client here uses the public/anon key with row-level
+//     security (RLS) enabled on the form tables. See the "Database" section of
+//     the README for the CREATE TABLE statements (RNL policies).
+//  3. To restrict inserts to the server only, enable RLS on each table and add
+//     a policy: "allow public inserts" (or, best, keep the anon key server-side
+//     only and never expose it to the browser — this route never does).
+//  4. Add Supabase anti-abuse (rate limiting) at your CDN if spam becomes an
+//     issue. For a local demo the local-file fallback below is enough.
+// ---------------------------------------------------------------------------
 import { NextResponse } from "next/server";
 import { contactSchema } from "@/lib/validation";
 import { getSupabaseClient } from "@/lib/supabase";
