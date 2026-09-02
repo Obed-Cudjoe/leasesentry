@@ -1,9 +1,12 @@
+// ---------------------------------------------------------------------------
+// POST /api/newsletter — adds a subscriber. Email is unique (one row per address).
+// Validated with Zod; stored in Turso (edge SQLite) or a local file (demo).
+// ---------------------------------------------------------------------------
 import { NextResponse } from "next/server";
 import { newsletterSchema } from "@/lib/validation";
-import { getSupabaseClient } from "@/lib/supabase";
+import { insertNewsletter } from "@/lib/turso";
 import { storeLocal } from "@/lib/local-store";
 
-// POST /api/newsletter — adds a subscriber. Email is unique (one row per address).
 export async function POST(req: Request) {
   let json: unknown;
   try {
@@ -21,17 +24,9 @@ export async function POST(req: Request) {
   }
   const { email } = parsed.data;
 
-  const supabase = getSupabaseClient();
-  if (supabase) {
-    // Upsert keeps one row per email (handles the unique constraint gracefully).
-    const { error } = await supabase
-      .from("newsletter_subscribers")
-      .upsert({ email }, { onConflict: "email" });
-    if (error) {
-      console.error("newsletter insert failed:", error.message);
-      return NextResponse.json({ ok: false, error: "Could not save your email." }, { status: 500 });
-    }
-  } else {
+  // Turso's unique constraint + ON CONFLICT DO NOTHING keeps one row per email.
+  const stored = await insertNewsletter({ email });
+  if (!stored) {
     await storeLocal("newsletter", { email });
   }
 

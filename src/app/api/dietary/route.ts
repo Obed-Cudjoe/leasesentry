@@ -1,9 +1,12 @@
+// ---------------------------------------------------------------------------
+// POST /api/dietary — stores a dietary / allergen enquiry.
+// Validated with Zod; stored in Turso (edge SQLite) or a local file (demo).
+// ---------------------------------------------------------------------------
 import { NextResponse } from "next/server";
 import { dietarySchema } from "@/lib/validation";
-import { getSupabaseClient } from "@/lib/supabase";
+import { insertDietary } from "@/lib/turso";
 import { storeLocal } from "@/lib/local-store";
 
-// POST /api/dietary — stores a dietary / allergen enquiry.
 export async function POST(req: Request) {
   let json: unknown;
   try {
@@ -21,16 +24,8 @@ export async function POST(req: Request) {
   }
   const { name, email, allergens, question } = parsed.data;
 
-  const supabase = getSupabaseClient();
-  if (supabase) {
-    const { error } = await supabase
-      .from("dietary_enquiries")
-      .insert({ name, email, allergens, question });
-    if (error) {
-      console.error("dietary insert failed:", error.message);
-      return NextResponse.json({ ok: false, error: "Could not save your enquiry." }, { status: 500 });
-    }
-  } else {
+  const stored = await insertDietary({ name, email, allergens, question });
+  if (!stored) {
     await storeLocal("dietary", { name, email, allergens, question });
   }
 

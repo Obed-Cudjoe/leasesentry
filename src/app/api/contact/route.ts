@@ -1,22 +1,22 @@
 // ---------------------------------------------------------------------------
+// POST /api/contact — stores a contact form submission.
+//
 // SECURITY NOTES (read if you're hardening this for production handoff)
 //  1. Every body is validated with Zod before it reaches the database — no
 //     raw user input is ever trusted. Invalid input is rejected with a 400.
-//  2. The Supabase client here uses the public/anon key with row-level
-//     security (RLS) enabled on the form tables. See the "Database" section of
-//     the README for the CREATE TABLE statements (RNL policies).
-//  3. To restrict inserts to the server only, enable RLS on each table and add
-//     a policy: "allow public inserts" (or, best, keep the anon key server-side
-//     only and never expose it to the browser — this route never does).
-//  4. Add Supabase anti-abuse (rate limiting) at your CDN if spam becomes an
-//     issue. For a local demo the local-file fallback below is enough.
+//  2. Storage backend: Turso (edge SQLite) when TURSO_DATABASE_URL +
+//     TURSO_AUTH_TOKEN are set; otherwise a local JSON file (demo mode).
+//     Both run on free tiers — nothing here is a paid service.
+//  3. Turso connects over HTTP with a scoped auth token (never expose the
+//     token to the browser — this route is server-only). Scope the token to
+//     the single database, and rotate it if leaked.
+//  4. Add rate limiting at your CDN (Netlify) if spam becomes an issue.
 // ---------------------------------------------------------------------------
 import { NextResponse } from "next/server";
 import { contactSchema } from "@/lib/validation";
-import { getSupabaseClient } from "@/lib/supabase";
+import { insertContact } from "@/lib/turso";
 import { storeLocal } from "@/lib/local-store";
 
-// POST /api/contact — stores a contact form submission.
 export async function POST(req: Request) {
   let json: unknown;
   try {
@@ -34,15 +34,9 @@ export async function POST(req: Request) {
   }
   const { name, email, message } = parsed.data;
 
-  // Save to Supabase Postgres when configured, otherwise to a local file (demo).
-  const supabase = getSupabaseClient();
-  if (supabase) {
-    const { error } = await supabase.from("contact_messages").insert({ name, email, message });
-    if (error) {
-      console.error("contact insert failed:", error.message);
-      return NextResponse.json({ ok: false, error: "Could not save your message." }, { status: 500 });
-    }
-  } else {
+  // Real database first; local file only as a fallback for the demo.
+  const stored = await insertContact({ name, email, message });
+  if (!stored) {
     await storeLocal("contact", { name, email, message });
   }
 

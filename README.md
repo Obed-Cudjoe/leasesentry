@@ -27,7 +27,7 @@ Everything is mobile-first, fast, and set up to rank in local search (metadata, 
 | **Next.js 15 (React 19)** | Framework — pages, routing, static generation |
 | **TypeScript** | Typed, predictable code |
 | **Tailwind CSS 4** | Styling |
-| **Supabase** (free tier) | PostgreSQL database for form submissions |
+| **Turso** (free tier) | Edge SQLite database for form submissions |
 | **Netlify** (free tier) | Hosting + automatic deploys from GitHub |
 
 Total cost to run: **$0**. (See `SECURITY_NOTES` in the API routes if you want to lock the database down further.)
@@ -44,9 +44,9 @@ cd leasesentry
 # 2. install dependencies
 npm install
 
-# 3. add your Supabase keys (optional for local demo — see below)
+# 3. add your Turso credentials (optional for local demo — see below)
 cp .env.example .env.local
-#   then open .env.local and paste your SUPABASE_URL + SUPABASE_ANON_KEY
+#   then open .env.local and paste your TURSO_DATABASE_URL + TURSO_AUTH_TOKEN
 
 # 4. start the dev server
 npm run dev
@@ -54,7 +54,7 @@ npm run dev
 
 Open **http://localhost:3000** in your browser.
 
-> **No Supabase keys yet?** The site runs fine without them. In local/demo mode the three forms save to a local file (`data/submissions.json`) so you can see submissions genuinely recorded. Add keys and the same forms write to your real Postgres database instead. (See the **Database** section.)
+> **No Turso credentials yet?** The site runs fine without them. In local/demo mode the three forms save to a local file (`data/submissions.json`) so you can see submissions genuinely recorded. Add Turso credentials and the same forms write to your real edge database instead. (See the **Database** section.)
 
 ---
 
@@ -65,46 +65,54 @@ This deploys automatically whenever you push to your `main` branch.
 1. Push the project to a new **GitHub** repository.
 2. Go to **Netlify → Add new site → Import an existing project → GitHub** and pick your repo. Netlify auto-detects Next.js (it reads the committed `netlify.toml`).
 3. Under **Site settings → Environment variables**, add:
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
+   - `TURSO_DATABASE_URL`
+   - `TURSO_AUTH_TOKEN`
    - (In local/dev only.) You already copied these into `.env.local`.
 4. Click **Deploy**. Netlify builds from the repo and gives you a live `https://your-site.netlify.app` URL.
 5. Every future `git push` to `main` redeploys automatically. Each pull request also gets its own preview URL — all free.
 
 ---
 
-## Database — create the tables (one time)
+## Database — Turso (free, edge SQLite)
 
-There are three form tables. Run this in the **Supabase SQL editor** (Dashboard → SQL Editor):
+Form submissions (contact, dietary enquiry, newsletter) are stored in a **Turso** database. Turso is serverless SQLite served over HTTP — perfect for Netlify functions, and its free tier (≈5 GB, hundreds of millions of row reads a month) is far more than a restaurant site will ever use.
+
+**Setup in ~2 minutes:**
+1. Go to **https://console.turso.tech** → sign up (free, no card).
+2. **Create a database** — name it `menu-truth` (nearest region is fine).
+3. Copy the connection: **Hosted** URL → `TURSO_DATABASE_URL` (starts with `libsql://`).
+4. Under **Settings → Auth tokens → Create token** → copy it → `TURSO_AUTH_TOKEN`.
+
+> **You do NOT need to create the tables by hand.** The site creates its three tables automatically on first submission (idempotent `CREATE TABLE IF NOT EXISTS`). The SQL below is shown for reference / if you want to inspect the schema in the dashboard:
 
 ```sql
 create table if not exists contact_messages (
-  id uuid primary key default gen_random_uuid(),
+  id integer primary key autoincrement,
   name text not null,
   email text not null,
   message text not null,
-  created_at timestamptz not null default now(),
+  created_at text not null default (datetime('now')),
   status text not null default 'new'
 );
 
 create table if not exists dietary_enquiries (
-  id uuid primary key default gen_random_uuid(),
+  id integer primary key autoincrement,
   name text not null,
   email text not null,
-  allergens text[] not null default '{}',
+  allergens text not null default '[]',
   question text not null,
-  created_at timestamptz not null default now(),
+  created_at text not null default (datetime('now')),
   status text not null default 'new'
 );
 
 create table if not exists newsletter_subscribers (
-  id uuid primary key default gen_random_uuid(),
+  id integer primary key autoincrement,
   email text not null unique,
-  created_at timestamptz not null default now()
+  created_at text not null default (datetime('now'))
 );
 ```
 
-> If you want, you can also store the menu in Postgres (a `menu_dishes` table is in the architecture notes). For this demo the menu lives in `src/lib/menu-data.ts` so the SEO-critical menu pages stay ultra-fast static pages.
+> Want the menu in the database too? A `menu_dishes` table is described in the architecture notes. For this demo the menu lives in `src/lib/menu-data.ts` so the SEO-critical menu pages stay ultra-fast static pages.
 
 ---
 
