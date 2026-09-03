@@ -17,15 +17,22 @@ interface StoredRow {
 }
 
 export async function storeLocal(kind: StoredRow["kind"], data: unknown) {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  const file = path.join(DATA_DIR, "submissions.json");
-  let rows: StoredRow[] = [];
+  // Never throw from this function: on serverless (Netlify) the filesystem can
+  // be read-only and we must not crash the request. It's a best-effort demo
+  // fallback only; real storage always goes to Turso.
   try {
-    rows = JSON.parse(await fs.readFile(file, "utf8"));
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    const file = path.join(DATA_DIR, "submissions.json");
+    let rows: StoredRow[] = [];
+    try {
+      rows = JSON.parse(await fs.readFile(file, "utf8"));
+    } catch {
+      rows = [];
+    }
+    rows.push({ kind, data, createdAt: new Date().toISOString() });
+    await fs.writeFile(file, JSON.stringify(rows, null, 2));
+    return rows.length;
   } catch {
-    rows = [];
+    return 0;
   }
-  rows.push({ kind, data, createdAt: new Date().toISOString() });
-  await fs.writeFile(file, JSON.stringify(rows, null, 2));
-  return rows.length;
 }
