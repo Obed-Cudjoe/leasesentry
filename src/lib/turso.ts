@@ -8,7 +8,14 @@
 // callers fall back to the local JSON store so the forms still record data.
 // ---------------------------------------------------------------------------
 
-import { createClient, type Client } from "@libsql/client";
+// Import the pure-HTTP client ("./web"). Netlify's function bundler struggles
+// with @libsql/client's default Node entry, which pulls in a native libsql
+// binary that fails to load at runtime (empty 500). The web entry uses Web
+// standard fetch APIs and has NO native dependencies — guaranteed to run in
+// Netlify functions (Node or edge). It speaks libSQL over HTTP/WebSocket, so
+// it works with the same libsql:// Turso URLs.
+// (see https://turso.tech/docs/sdk/ts/reference for the client variants)
+import { createClient, type Client } from "@libsql/client/web";
 import type { ContactInput, DietaryInput, NewsletterInput } from "./validation";
 
 const url = process.env.TURSO_DATABASE_URL;
