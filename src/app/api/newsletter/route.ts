@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 import { NextResponse } from "next/server";
 import { newsletterSchema } from "@/lib/validation";
-import { insertNewsletter } from "@/lib/turso";
+import { insertNewsletter, tursoConfigured } from "@/lib/turso";
 import { storeLocal } from "@/lib/local-store";
 
 export async function POST(req: Request) {
@@ -24,9 +24,17 @@ export async function POST(req: Request) {
   }
   const { email } = parsed.data;
 
-  // Turso's unique constraint + ON CONFLICT DO NOTHING keeps one row per email.
-  const stored = await insertNewsletter({ email });
-  if (!stored) {
+  if (tursoConfigured) {
+    try {
+      await insertNewsletter({ email });
+    } catch (e) {
+      console.error("newsletter/turso store failed:", e);
+      return NextResponse.json(
+        { ok: false, error: "We couldn't save your email right now. Please try again." },
+        { status: 500 }
+      );
+    }
+  } else {
     await storeLocal("newsletter", { email });
   }
 

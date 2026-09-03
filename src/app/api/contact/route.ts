@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 import { NextResponse } from "next/server";
 import { contactSchema } from "@/lib/validation";
-import { insertContact } from "@/lib/turso";
+import { insertContact, tursoConfigured } from "@/lib/turso";
 import { storeLocal } from "@/lib/local-store";
 
 export async function POST(req: Request) {
@@ -34,9 +34,20 @@ export async function POST(req: Request) {
   }
   const { name, email, message } = parsed.data;
 
-  // Real database first; local file only as a fallback for the demo.
-  const stored = await insertContact({ name, email, message });
-  if (!stored) {
+  if (tursoConfigured) {
+    // Real database configured. A failure here is an actual error — surface a
+    // readable message (and log the cause) rather than an empty 500.
+    try {
+      await insertContact({ name, email, message });
+    } catch (e) {
+      console.error("contact/turso store failed:", e);
+      return NextResponse.json(
+        { ok: false, error: "We couldn't save your message right now. Please try again." },
+        { status: 500 }
+      );
+    }
+  } else {
+    // Demo mode (no Turso creds) — write to a local file so submissions record.
     await storeLocal("contact", { name, email, message });
   }
 
